@@ -24,7 +24,7 @@
 #  MA 02110-1301, USA.
 #  
 #  
-
+import sys
 import time
 import tornado.ioloop
 from tornado.httpclient import AsyncHTTPClient
@@ -38,19 +38,30 @@ from configparser import ConfigParser
 #  Config
 #  
 #-----------------------------------------------------------------------
+serverPort  = 0
+mqttIP      = ''
+mqttPort    = 0
+logLev      = ''
+locationURI = ''
 
 config = ConfigParser()
 try:
-	config.read("rainradar.conf")
+	print("1")
+	config.read(sys.argv[1])
+	log_txt="config file " + str(sys.argv[1])
+
 except:
-	log.info("could not read config file")
+	print("2")
+	log_txt="could not read config file " + str(sys.argv[1])
 	serverPort  = 8888
 	mqttIP      = 'localhost'
 	mqttPort    = 1883
+	logLev      = "DEBUG"
 	logLevel    = logging.DEBUG
 	locationURI = '/deutschland/niederkruechten/overhetfeld/DE0007509013.html#niederschlag'
 else:
 	try:
+		print("3")
 		serverPort = int(config["SERVER"]["Port"])
 	except:
 		serverPort = 8880
@@ -75,18 +86,13 @@ else:
 		if logLev == "CRITICAL":
 			logLevel    = logging.CRITICAL
 	except:
+		logLev      = "DEBUG"
 		logLevel    = logging.DEBUG
 	try:
 		locationURI = config["LOCATION"]["URI"]
 	except:
 		locationURI = '/deutschland/niederkruchten/overhetfeld/DE0007509013.html#niederschlag'
 		
-	print("Konfiguration:")
-	print("serverPort: %s", str(serverPort))
-	print("mqttIP: %s", mqttIP)
-	print("mpttPort: %s", str(mqttPort))
-	print("logLev: %s", logLev)
-	print("locationURI: %s", locationURI)
 
 #-----------------------------------------------------------------------
 #  Logger
@@ -102,14 +108,19 @@ logging.basicConfig(
 	format=log_format,
 	# Declare handlers
 	handlers=[
-		journal.JournalHandler()
+		journal.JournaldLogHandler()
 	]
 )
 
 log = logging.getLogger(__name__)
 
-log.info("hier soll die aktuelle Konfiguration ausgegeben werden.")
-
+log.info("start rainradar")
+log.info(log_txt)
+log.info("logLev: " + logLev)
+log.info("locationURI: " + locationURI)
+log.info("serverPort: " + str(serverPort))
+log.info("mqttIP: " + mqttIP)
+log.info("mgttPort: " + str(mqttPort))
 
 rains = {}
 
@@ -133,8 +144,11 @@ def mqttAlarm() :
 
 	for x in range(4) :
 		nowString = str(now//60).zfill(2) + ":" + str(now%60).zfill(2)           #zfill für führende Nullen (1:2 -> 01:02)
-		if rains[nowString] > 0 :
-			actAlarm = "on"
+		try:
+			if rains[nowString] > 0 :
+				actAlarm = "on"
+		except:
+			log.warning("no rainvalue found")
 		now = (now + 5) % (24*60) # Werte 00:00 - 23:59 (Falls durch Addition nächster Tag erreicht wird)
 	if actAlarm != lastAlarm :
 		lastAlarm = actAlarm
@@ -194,7 +208,7 @@ class MainHandler(tornado.web.RequestHandler):
 	def get(self):
 		self.write("Hello Rain")
 
-def main(args):
+def main():
 	app = tornado.web.Application([ (r"/", MainHandler),(r"/now", RainHandler) ])
 	app.listen(serverPort)    # Port Number
 	log.info("start RainAlarm-App on Port " + str(serverPort))
@@ -204,4 +218,4 @@ def main(args):
 
 if __name__ == '__main__':
 	import sys
-	sys.exit(main(sys.argv))
+	sys.exit(main())
