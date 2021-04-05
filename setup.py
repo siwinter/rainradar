@@ -18,7 +18,8 @@ setuptools.setup(
     },
     install_requires=[
 		'tornado', 
-		'paho-mqtt'
+		'paho-mqtt',
+		'systemd'
 		],
     classifiers=[
         "Programming Language :: Python :: 3",
