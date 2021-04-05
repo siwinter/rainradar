@@ -23,6 +23,16 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 #  
+#
+#  rudimentäre WebApp, basierend auf Tornado-Framework
+#  liefert zwei Seiten aus
+#  Mainhandler für '/' sagt "Hello Rain"
+#  Rainhandler für '/now' liefert aktuelle Regenwerte in JSON-Format
+#
+#  Minütlich wird eine Webseite von www.wetter.com aufgerufen, die eine Regenradarauswertung für die nächsten zwei Stunden enthält.
+#  Aus der Seite werden die erwarteten Regenmengen im fünf Minutenraster ermittelt.
+#  Wird innerhalb der nächsten 15 Minuten Regen erwartet, wird eine entsprechende MQTT-Meldung erzeugt (Payload = "on").
+#  Nach dme Ende des Regens wird die Meldung zurückgenommen (Payload = "off")
 #  
 import sys
 import time
@@ -41,6 +51,7 @@ from configparser import ConfigParser
 serverPort  = 0
 mqttIP      = ''
 mqttPort    = 0
+mqttTopic   = ''
 logLev      = ''
 locationURI = ''
 
@@ -55,7 +66,8 @@ except:
 	log_txt="could not read config file " + str(sys.argv[1])
 	serverPort  = 8888
 	mqttIP      = 'localhost'
-	mqttPort    = 1883
+	mqttPort    = 1884
+	mqttTopic   = 'RainAlarm'
 	logLev      = "DEBUG"
 	logLevel    = logging.DEBUG
 	locationURI = '/deutschland/niederkruechten/overhetfeld/DE0007509013.html#niederschlag'
@@ -73,6 +85,10 @@ else:
 		mqttPort = int(config["MQTT"]["Port"])
 	except:
 		mqttPort    = 1884
+	try:
+		mqttTopic = config["MQTT"]["Topic"]
+	except:
+		mqttTopic    = 'RainAlarm'
 	try:
 		logLev    = config["LOGGING"]["level"]
 		if logLev == "DEBUG":
@@ -133,7 +149,7 @@ rainVals = {
   "ffa800": 5,
   "e60000": 6 }
 
-lastAlarm = "on"
+lastAlarm = "init"
 
 def mqttAlarm() :
 	log.debug("mqttAlarm")
@@ -145,6 +161,7 @@ def mqttAlarm() :
 	for x in range(4) :
 		nowString = str(now//60).zfill(2) + ":" + str(now%60).zfill(2)           #zfill für führende Nullen (1:2 -> 01:02)
 		try:
+			log.debug("at " + nowString + " rainvalue: " + str(rains[nowString]))
 			if rains[nowString] > 0 :
 				actAlarm = "on"
 		except:
@@ -154,15 +171,15 @@ def mqttAlarm() :
 		lastAlarm = actAlarm
 		log.info("mqttAlarm: %s", lastAlarm)
 		try:
-			publish.single("RainAlarm", lastAlarm, hostname=mqttIP, port=mqttPort)
+			publish.single(mqttTopic, lastAlarm, hostname=mqttIP, port=mqttPort)
 		except:
 			log.warning("could not publish to " + mqttIP + " Port: " + str(mqttPort))
 
 async def asynchronous_fetch():
-	tornado.ioloop.IOLoop.current().add_timeout(time.time() + 60, lambda:asynchronous_fetch())
+	tornado.ioloop.IOLoop.current().add_timeout(time.time() + 60, lambda:asynchronous_fetch())   # call this function again in 60 secs 
 	url = 'https://www.wetter.com' + locationURI
 	try :
-		response = await AsyncHTTPClient().fetch(url)
+		response = await AsyncHTTPClient().fetch(url)                                            # fetch rainforcast
 	except :
 		log.warning("error fetch url")
 	else: 
@@ -180,10 +197,10 @@ async def asynchronous_fetch():
 					i = txt.find("#", i) + 1		# find rain colour
 					j = txt.find(";", i)
 					try :
-						r = rainVals[txt[i:j]]		# get rain value 
+						r = rainVals[txt[i:j]]		# get rain value from local table of values
 					except :
 						r = 1
-					rains[t]=r						# add new key:vallue ("17:20" : 2)
+					rains[t]=r						# add new key:vallue (exp: "17:20" : 2)
 					
 				else :
 					mqttAlarm()
@@ -192,7 +209,7 @@ async def asynchronous_fetch():
 			log.warning("fetch url return code " + str(response.code))
 
 
-class RainHandler(tornado.web.RequestHandler):
+class RainHandler(tornado.web.RequestHandler):                           # webpage to deliver actual rain values in json-Format 
 	def get(self):
 		now = (time.localtime().tm_hour *60) + (time.localtime().tm_min // 5 *5) #Anzahl der Minuten des Tages auf 5min gerundet
 	
@@ -204,7 +221,7 @@ class RainHandler(tornado.web.RequestHandler):
 		answer = answer + " }"
 		self.write(answer)
 
-class MainHandler(tornado.web.RequestHandler):
+class MainHandler(tornado.web.RequestHandler):                           # webpage says "Hello Rain"
 	def get(self):
 		self.write("Hello Rain")
 
