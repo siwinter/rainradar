@@ -32,7 +32,7 @@
 #  Minütlich wird eine Webseite von www.wetter.com aufgerufen, die eine Regenradarauswertung für die nächsten zwei Stunden enthält.
 #  Aus der Seite werden die erwarteten Regenmengen im fünf Minutenraster ermittelt.
 #  Wird innerhalb der nächsten 15 Minuten Regen erwartet, wird eine entsprechende MQTT-Meldung erzeugt (Payload = "on").
-#  Nach dme Ende des Regens wird die Meldung zurückgenommen (Payload = "off")
+#  15 Minuten nach dem Ende des Regens wird die Meldung zurückgenommen (Payload = "off")
 #  
 import sys
 import time
