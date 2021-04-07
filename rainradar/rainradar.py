@@ -150,11 +150,15 @@ rainVals = {
   "e60000": 6 }
 
 lastAlarm = "init"
+delayTimer = 0
 
 def mqttAlarm() :
+	
+	global lastAlarm
+	global delayTimer
+	
 	log.debug("mqttAlarm")
 	now = (time.localtime().tm_hour *60) + (time.localtime().tm_min // 5 *5) #Anzahl der Minuten des Tages auf 5min gerundet
-	global lastAlarm
 	
 	actAlarm = "off"
 
@@ -167,13 +171,33 @@ def mqttAlarm() :
 		except:
 			log.warning("no rainvalue found")
 		now = (now + 5) % (24*60) # Werte 00:00 - 23:59 (Falls durch Addition nächster Tag erreicht wird)
-	if actAlarm != lastAlarm :
-		lastAlarm = actAlarm
-		log.info("mqttAlarm: %s", lastAlarm)
-		try:
-			publish.single(mqttTopic, lastAlarm, hostname=mqttIP, port=mqttPort)
-		except:
-			log.warning("could not publish to " + mqttIP + " Port: " + str(mqttPort))
+		
+	if actAlarm == "on" :
+		delayTimer = 16
+		
+	if actAlarm == "off" :
+		delayTimer = delayTimer -1
+		
+	if delaytimer < 0 :
+		delayTimer = 0
+		
+	if actAlarm == "off" :
+		if delayTimer > 0 :
+			actAlarm = "on"
+			
+	log.info("mqttAlarm: %s", actAlarm)
+	try:
+		publish.single(mqttTopic, lastAlarm, hostname=mqttIP, port=mqttPort)
+	except:
+		log.warning("could not publish to " + mqttIP + " Port: " + str(mqttPort))
+		
+#	if actAlarm != lastAlarm :
+#		lastAlarm = actAlarm
+#		log.info("mqttAlarm: %s", lastAlarm)
+#		try:
+#			publish.single(mqttTopic, lastAlarm, hostname=mqttIP, port=mqttPort)
+#		except:
+#			log.warning("could not publish to " + mqttIP + " Port: " + str(mqttPort))
 
 async def asynchronous_fetch():
 	tornado.ioloop.IOLoop.current().add_timeout(time.time() + 60, lambda:asynchronous_fetch())   # call this function again in 60 secs 
