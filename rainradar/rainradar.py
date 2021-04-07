@@ -178,7 +178,7 @@ def mqttAlarm() :
 	if actAlarm == "off" :
 		delayTimer = delayTimer -1
 		
-	if delaytimer < 0 :
+	if delayTimer < 0 :
 		delayTimer = 0
 		
 	if actAlarm == "off" :
@@ -187,7 +187,7 @@ def mqttAlarm() :
 			
 	log.info("mqttAlarm: %s", actAlarm)
 	try:
-		publish.single(mqttTopic, lastAlarm, hostname=mqttIP, port=mqttPort)
+		publish.single(mqttTopic, actAlarm, hostname=mqttIP, port=mqttPort)
 	except:
 		log.warning("could not publish to " + mqttIP + " Port: " + str(mqttPort))
 		
