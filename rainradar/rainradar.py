@@ -51,13 +51,13 @@ from configparser import ConfigParser
 #-----------------------------------------------------------------------
 
 
-serverPort  = 8888
+serverPort  = 8095
 mqttIP      = 'localhost'
-mqttPort    = 1884
-mqttTopic   = 'rainAlarm'
+mqttPort    = 1883
+mqttTopic   = 'inf/rainAlarm'
 logLev      = 'DEBUG'
 logLevel    = logging.DEBUG
-locationURI = '/deutschland/niederkruechten/overhetfeld/DE0007509013.html#niederschlag'
+locationURI = '/deutschland/niederkruechten/kapelle/DE3205889.html#niederschlag'
 log_txt = "run with default settings"
 
 
@@ -69,30 +69,27 @@ try:
 
 except:
 	log_txt="could not read config file " + str(sys.argv[1])
-	serverPort  = 8888
-	mqttIP      = 'localhost'
-	mqttPort    = 1884
-	mqttTopic   = 'RainAlarm'
-	logLev      = "DEBUG"
-	logLevel    = logging.DEBUG
-	locationURI = '/deutschland/niederkruechten/overhetfeld/DE0007509013.html#niederschlag'
 else:
 	try:
 		serverPort = int(config["SERVER"]["Port"])
 	except:
-		serverPort = 8880
+#		serverPort = 8880
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		mqttIP = config["MQTT"]["IP"]
 	except:
-		mqttIP = "localhost"
+#		mqttIP = "localhost"
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		mqttPort = int(config["MQTT"]["Port"])
 	except:
-		mqttPort    = 1884
+#		mqttPort    = 1884
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		mqttTopic = config["MQTT"]["Topic"]
 	except:
-		mqttTopic    = 'RainAlarm'
+#		mqttTopic    = 'RainAlarm'
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		logLev    = config["LOGGING"]["level"]
 		if logLev == "DEBUG":
@@ -106,12 +103,14 @@ else:
 		if logLev == "CRITICAL":
 			logLevel    = logging.CRITICAL
 	except:
-		logLev      = "DEBUG"
-		logLevel    = logging.DEBUG
+#		logLev      = "DEBUG"
+#		logLevel    = logging.DEBUG
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		locationURI = config["LOCATION"]["URI"]
 	except:
-		locationURI = '/deutschland/niederkruchten/overhetfeld/DE0007509013.html#niederschlag'
+#		locationURI = '/deutschland/niederkruchten/overhetfeld/DE0007509013.html#niederschlag'
+		log_txt="error reading config from file " + str(sys.argv[1])
 	
 
 #-----------------------------------------------------------------------
