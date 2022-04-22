@@ -30,9 +30,10 @@
 #  Rainhandler für '/now' liefert aktuelle Regenwerte in JSON-Format
 #
 #  Minütlich wird eine Webseite von www.wetter.com aufgerufen, die eine Regenradarauswertung für die nächsten zwei Stunden enthält.
-#  Aus der Seite werden die erwarteten Regenmengen im fünf Minutenraster ermittelt.
-#  Wird innerhalb der nächsten 15 Minuten Regen erwartet, wird eine entsprechende MQTT-Meldung erzeugt (Payload = "on").
-#  15 Minuten nach dem Ende des Regens wird die Meldung zurückgenommen (Payload = "off")
+#  Aus der Seite werden die erwarteten Regenmengen im fünf Minutenraster ermittel
+#  Bereits 15 Minuten vor eintreffen des Regen, wird eine entsprechende MQTT-Meldung erzeugt (Payload = "on").
+#  Nach dem Ende des Regens wird noch 15 min gewartet, bevor die Meldung zurückgenommen wird. (Payload = "off")
+#  Der Alarm bleibt jedoch bestehen, wenn innerhalb der nächsten Stunde neuer Regen vorhergesagt ist
 #  
 import sys
 import time
@@ -48,47 +49,47 @@ from configparser import ConfigParser
 #  Config
 #  
 #-----------------------------------------------------------------------
-serverPort  = 0
-mqttIP      = ''
-mqttPort    = 0
-mqttTopic   = ''
-logLev      = ''
-locationURI = ''
+
+
+serverPort  = 8095
+mqttIP      = 'localhost'
+mqttPort    = 1883
+mqttTopic   = 'inf/rainAlarm'
+logLev      = 'DEBUG'
+logLevel    = logging.DEBUG
+locationURI = '/deutschland/niederkruechten/kapelle/DE3205889.html#niederschlag'
+log_txt = "run with default settings"
+
 
 config = ConfigParser()
+
 try:
-	print("1")
 	config.read(sys.argv[1])
-	log_txt="config file " + str(sys.argv[1])
+	log_txt="run with setting from config file " + str(sys.argv[1])
 
 except:
-	print("2")
 	log_txt="could not read config file " + str(sys.argv[1])
-	serverPort  = 8888
-	mqttIP      = 'localhost'
-	mqttPort    = 1884
-	mqttTopic   = 'RainAlarm'
-	logLev      = "DEBUG"
-	logLevel    = logging.DEBUG
-	locationURI = '/deutschland/niederkruechten/overhetfeld/DE0007509013.html#niederschlag'
 else:
 	try:
-		print("3")
 		serverPort = int(config["SERVER"]["Port"])
 	except:
-		serverPort = 8880
+#		serverPort = 8880
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		mqttIP = config["MQTT"]["IP"]
 	except:
-		mqttIP = "localhost"
+#		mqttIP = "localhost"
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		mqttPort = int(config["MQTT"]["Port"])
 	except:
-		mqttPort    = 1884
+#		mqttPort    = 1884
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		mqttTopic = config["MQTT"]["Topic"]
 	except:
-		mqttTopic    = 'RainAlarm'
+#		mqttTopic    = 'RainAlarm'
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		logLev    = config["LOGGING"]["level"]
 		if logLev == "DEBUG":
@@ -102,13 +103,15 @@ else:
 		if logLev == "CRITICAL":
 			logLevel    = logging.CRITICAL
 	except:
-		logLev      = "DEBUG"
-		logLevel    = logging.DEBUG
+#		logLev      = "DEBUG"
+#		logLevel    = logging.DEBUG
+		log_txt="error reading config from file " + str(sys.argv[1])
 	try:
 		locationURI = config["LOCATION"]["URI"]
 	except:
-		locationURI = '/deutschland/niederkruchten/overhetfeld/DE0007509013.html#niederschlag'
-		
+#		locationURI = '/deutschland/niederkruchten/overhetfeld/DE0007509013.html#niederschlag'
+		log_txt="error reading config from file " + str(sys.argv[1])
+	
 
 #-----------------------------------------------------------------------
 #  Logger
@@ -149,55 +152,56 @@ rainVals = {
   "ffa800": 5,
   "e60000": 6 }
 
-lastAlarm = "init"
-delayTimer = 0
+delayTimer = 0		# to wait 15 min after rain ends then send "alarm off"
+state = 0			# init, not raining
 
 def mqttAlarm() :
-	
-	global lastAlarm
+
 	global delayTimer
+	global state
 	
-	log.debug("mqttAlarm")
 	now = (time.localtime().tm_hour *60) + (time.localtime().tm_min // 5 *5) #Anzahl der Minuten des Tages auf 5min gerundet
 	
-	actAlarm = "off"
 
-	for x in range(4) :
+	for nextRain in range(12) :
 		nowString = str(now//60).zfill(2) + ":" + str(now%60).zfill(2)           #zfill für führende Nullen (1:2 -> 01:02)
 		try:
 			log.debug("at " + nowString + " rainvalue: " + str(rains[nowString]))
 			if rains[nowString] > 0 :
-				actAlarm = "on"
+				break
 		except:
 			log.warning("no rainvalue found")
 		now = (now + 5) % (24*60) # Werte 00:00 - 23:59 (Falls durch Addition nächster Tag erreicht wird)
 		
-	if actAlarm == "on" :
-		delayTimer = 16
+	log.debug("mqttAlarm: nextRain: " + str(nextRain))
+	alarm = "off"
+	if nextRain < 3 :
+		state = 1	# raining
+		alarm = "on"
+		delayTimer = 15
 		
-	if actAlarm == "off" :
-		delayTimer = delayTimer -1
+	else :
+		if state == 1 :						#raining
+			alarm = "on"
+			if nextRain > 10 :
+				state = 2	# delay
+				
+		elif state == 2 :					# delay
+			alarm = "on"
+			if delayTimer < 1 :
+				if nextRain > 10 :
+					alarm = "off"
+					state = 0   # init
+			else :
+				delayTimer = delayTimer - 1
+				
 		
-	if delayTimer < 0 :
-		delayTimer = 0
-		
-	if actAlarm == "off" :
-		if delayTimer > 0 :
-			actAlarm = "on"
-			
-	log.info("mqttAlarm: %s", actAlarm)
+	log.info("mqttAlarm: %s", alarm)
 	try:
-		publish.single(mqttTopic, actAlarm, hostname=mqttIP, port=mqttPort)
+		publish.single(mqttTopic, alarm, hostname=mqttIP, port=mqttPort)
 	except:
 		log.warning("could not publish to " + mqttIP + " Port: " + str(mqttPort))
 		
-#	if actAlarm != lastAlarm :
-#		lastAlarm = actAlarm
-#		log.info("mqttAlarm: %s", lastAlarm)
-#		try:
-#			publish.single(mqttTopic, lastAlarm, hostname=mqttIP, port=mqttPort)
-#		except:
-#			log.warning("could not publish to " + mqttIP + " Port: " + str(mqttPort))
 
 async def asynchronous_fetch():
 	tornado.ioloop.IOLoop.current().add_timeout(time.time() + 60, lambda:asynchronous_fetch())   # call this function again in 60 secs 
