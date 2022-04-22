@@ -55,8 +55,8 @@ serverPort  = 8095
 mqttIP      = 'localhost'
 mqttPort    = 1883
 mqttTopic   = 'inf/rainAlarm'
-logLev      = 'DEBUG'
-logLevel    = logging.DEBUG
+logLev      = 'INFO'
+logLevel    = logging.INFO
 locationURI = '/deutschland/niederkruechten/kapelle/DE3205889.html#niederschlag'
 log_txt = "run with default settings"
 
