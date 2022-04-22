@@ -30,10 +30,10 @@
 #  Rainhandler für '/now' liefert aktuelle Regenwerte in JSON-Format
 #
 #  Minütlich wird eine Webseite von www.wetter.com aufgerufen, die eine Regenradarauswertung für die nächsten zwei Stunden enthält.
-#  Aus der Seite werden die erwarteten Regenmengen im fünf Minutenraster ermittelt.
+#  Aus der Seite werden die erwarteten Regenmengen im fünf Minutenraster ermittel
 #  Bereits 15 Minuten vor eintreffen des Regen, wird eine entsprechende MQTT-Meldung erzeugt (Payload = "on").
 #  Nach dem Ende des Regens wird noch 15 min gewartet, bevor die Meldung zurückgenommen wird. (Payload = "off")
-#  Der Alarm bleibt jedoch bestehen, wenn innerhalb der nächsten Stunde neuer Regen vorhergesagt ist.
+#  Der Alarm bleibt jedoch bestehen, wenn innerhalb der nächsten Stunde neuer Regen vorhergesagt ist
 #  
 import sys
 import time
